@@ -71,6 +71,7 @@ class OrderTrackingPageState extends State<OrderTrackingPage>
     Location location = Location();
     location.getLocation().then(
       (location) {
+        dev.log('got location');
         currentLocation = location;
         setState(() {});
       },
@@ -80,10 +81,11 @@ class OrderTrackingPageState extends State<OrderTrackingPage>
 
     location.onLocationChanged.listen(
       (newLoc) {
+        dev.log('onListner');
         currentLocation = newLoc;
         travelled.add(LatLng(newLoc.latitude!, newLoc.longitude!));
         travelled.removeAt(0);
-        // print(travelled.toString());
+        dev.log(travelled.toString());
         animateCar(
           travelled[0].latitude,
           travelled[0].longitude,
