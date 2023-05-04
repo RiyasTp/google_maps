@@ -69,14 +69,11 @@ class PolylineAnimationPageState extends State<PolylineAnimationPage>
         if (_acontroller.isCompleted) {
           _acontroller.repeat();
         }
-        setState(() {
-          // Calculate the index of the current point based on the animation value
-          int index = animatepoly.value.toInt();
-          dev.log('setstate');
+        // Calculate the index of the current point based on the animation value
+        int index = animatepoly.value.toInt();
 
-          // Create a sublist of points up to the current index
-          _route = polylineCoordinates.sublist(0, index + 1);
-        });
+        // Create a sublist of points up to the current index
+        _route = polylineCoordinates.sublist(0, index + 1);
       });
 
     _acontroller.forward();
@@ -99,34 +96,40 @@ class PolylineAnimationPageState extends State<PolylineAnimationPage>
           icon: currentLocationIcon),
     };
     return Scaffold(
-        body: GoogleMap(
-      initialCameraPosition: const CameraPosition(
-        tilt: 90,
-        target: orginLatLng,
-        zoom: 13.5,
-      ),
-      polylines: {
-        Polyline(
-          polylineId: const PolylineId("main_route"),
-          points: polylineCoordinates,
-          color: const Color.fromARGB(255, 168, 168, 168),
-          width: 5,
-        ),
-        Polyline(
-          polylineId: const PolylineId("route"),
-          points: _route,
-          color: const Color(0xFF8A59A3),
-          width: 6,
-        ),
-      },
-      markers: {
-        ...markers,
-      },
-      onMapCreated: (mapController) {
-        _gcontroller = mapController;
-        _gcontroller.setMapStyle(mapStyle);
-      },
-    ));
+        body: AnimatedBuilder(
+            animation: _acontroller,
+            builder: (context, snapshot) {
+              dev.log('building animation');
+              return GoogleMap(
+                initialCameraPosition: const CameraPosition(
+                  tilt: 90,
+                  target: orginLatLng,
+                  zoom: 13.5,
+                ),
+                polylines: {
+                  Polyline(
+                    polylineId: const PolylineId("main_route"),
+                    points: polylineCoordinates,
+                    color: const Color.fromARGB(255, 168, 168, 168),
+                    width: 5,
+                  ),
+                  Polyline(
+                    polylineId: const PolylineId("route"),
+                    points: _route,
+                    color: const Color(0xFF8A59A3),
+                    width: 6,
+                  ),
+                },
+                markers: {
+                  ...markers,
+                },
+                onMapCreated: (mapController) {
+                  dev.log('======Build Map=======');
+                  _gcontroller = mapController;
+                  _gcontroller.setMapStyle(mapStyle);
+                },
+              );
+            }));
   }
 }
 
