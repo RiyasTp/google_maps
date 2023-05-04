@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:developer' as dev;
-
 import 'package:google_maps/map_style/map_style.dart';
 // ignore: depend_on_referenced_packages
 
@@ -21,9 +20,9 @@ class PolylineAnimationPageState extends State<PolylineAnimationPage>
   static const LatLng sourceLocation = LatLng(37.33500926, -122.03272188);
   static const LatLng destination = LatLng(37.33429383, -122.06600055);
 
-  final travelled = [sourceLocation, destination];
-
   late GoogleMapController _gcontroller;
+  late AnimationController _acontroller;
+  late Animation<double> animatepoly;
 
   BitmapDescriptor currentLocationIcon = BitmapDescriptor.defaultMarker;
 
@@ -31,8 +30,9 @@ class PolylineAnimationPageState extends State<PolylineAnimationPage>
   Stream<List<Marker>> get mapMarkerStream => _mapMarkerSC.stream;
 
   List<LatLng> polylineCoordinates = [];
+  List<LatLng> _route = [];
 
-  void getPolyPoints() async {
+  void getPolyPoints() {
     dev.log('started getpolypoints');
     PolylinePoints polylinePoints = PolylinePoints();
 
@@ -45,7 +45,6 @@ class PolylineAnimationPageState extends State<PolylineAnimationPage>
           LatLng(point.latitude, point.longitude),
         );
       }
-
       // dev.log(polylineCoordinates.toString());
       setState(() {});
     }
@@ -59,11 +58,33 @@ class PolylineAnimationPageState extends State<PolylineAnimationPage>
   void initState() {
     getPolyPoints();
 
+    _acontroller = AnimationController(
+      duration: const Duration(seconds: 5),
+      vsync: this,
+    );
+
+    animatepoly = Tween(begin: 0.0, end: polylineCoordinates.length.toDouble())
+        .animate(_acontroller)
+      ..addListener(() {
+        if (_acontroller.isCompleted) {
+          _acontroller.repeat();
+        }
+        // Calculate the index of the current point based on the animation value
+        int index = animatepoly.value.toInt();
+
+        // Create a sublist of points up to the current index
+        _route = polylineCoordinates.sublist(0, index + 1);
+      });
+
+    _acontroller.forward();
+
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
+    dev.log('building screen');
+
     Set<Marker> markers = {
       const Marker(
         markerId: MarkerId("source"),
@@ -75,29 +96,40 @@ class PolylineAnimationPageState extends State<PolylineAnimationPage>
           icon: currentLocationIcon),
     };
     return Scaffold(
-        body: GoogleMap(
-      initialCameraPosition: const CameraPosition(
-        tilt: 90,
-        target: orginLatLng,
-        zoom: 13.5,
-      ),
-      polylines: {
-        Polyline(
-          polylineId: const PolylineId("route"),
-          points: polylineCoordinates,
-          color: const Color(0xFF8A59A3),
-          width: 6,
-        ),
-      },
-      markers: {
-        ...markers,
-      },
-      onMapCreated: (mapController) {
-        _gcontroller = mapController;
-        _gcontroller.setMapStyle(mapStyle);
-        
-      },
-    ));
+        body: AnimatedBuilder(
+            animation: _acontroller,
+            builder: (context, snapshot) {
+              dev.log('building animation');
+              return GoogleMap(
+                initialCameraPosition: const CameraPosition(
+                  tilt: 90,
+                  target: orginLatLng,
+                  zoom: 13.5,
+                ),
+                polylines: {
+                  Polyline(
+                    polylineId: const PolylineId("main_route"),
+                    points: polylineCoordinates,
+                    color: const Color.fromARGB(255, 168, 168, 168),
+                    width: 5,
+                  ),
+                  Polyline(
+                    polylineId: const PolylineId("route"),
+                    points: _route,
+                    color: const Color(0xFF8A59A3),
+                    width: 6,
+                  ),
+                },
+                markers: {
+                  ...markers,
+                },
+                onMapCreated: (mapController) {
+                  dev.log('======Build Map=======');
+                  _gcontroller = mapController;
+                  _gcontroller.setMapStyle(mapStyle);
+                },
+              );
+            }));
   }
 }
 

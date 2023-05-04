@@ -20,8 +20,8 @@ class OrderTrackingPage extends StatefulWidget {
 class OrderTrackingPageState extends State<OrderTrackingPage>
     with TickerProviderStateMixin {
   // final Completer<GoogleMapController> _controller = Completer();
-  static const LatLng sourceLocation = LatLng(37.33500926, -122.03272188);
   static const LatLng destination = LatLng(37.33429383, -122.06600055);
+  static const LatLng sourceLocation = LatLng(37.33500926, -122.03272188);
 
   final travelled = [sourceLocation, destination];
 
@@ -144,9 +144,9 @@ class OrderTrackingPageState extends State<OrderTrackingPage>
                 ...markers,
                 ...Set<Marker>.of(snapshot.data ?? [])
               },
-
               onMapCreated: (mapController) {
                 // _controller.complete(mapController);
+                dev.log("map created");
                 _gcontroller = mapController;
                 _gcontroller.setMapStyle(mapStyle);
                 // setState(() {});
