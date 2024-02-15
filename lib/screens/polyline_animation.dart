@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:developer' as dev;
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps/map_style/map_style.dart';
 // ignore: depend_on_referenced_packages
 
 import 'package:flutter/material.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:location/location.dart';
 
 class PolylineAnimationPage extends StatefulWidget {
   const PolylineAnimationPage({Key? key}) : super(key: key);
@@ -52,7 +52,7 @@ class PolylineAnimationPageState extends State<PolylineAnimationPage>
     dev.log('completed getpolypoints');
   }
 
-  LocationData? currentLocation;
+  Position? currentLocation;
 
   @override
   void initState() {

@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:developer' as dev;
 import 'package:dio/dio.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps/map_style/map_style.dart';
+import 'package:google_maps/utils/poly_line_utils.dart';
 // ignore: depend_on_referenced_packages
 import 'package:vector_math/vector_math.dart';
 
@@ -9,7 +11,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:location/location.dart';
 
 class OrderTrackingPage extends StatefulWidget {
   const OrderTrackingPage({Key? key}) : super(key: key);
@@ -27,7 +28,7 @@ class OrderTrackingPageState extends State<OrderTrackingPage>
 
   final List<Marker> _markers = <Marker>[];
   Animation<double>? _animation;
-  late GoogleMapController _gcontroller;
+  GoogleMapController? _gcontroller;
 
   BitmapDescriptor currentLocationIcon = BitmapDescriptor.defaultMarker;
 
@@ -37,7 +38,7 @@ class OrderTrackingPageState extends State<OrderTrackingPage>
 
   List<LatLng> polylineCoordinates = [];
   void setCustomMarkerIcon() {
-    BitmapDescriptor.fromAssetImage(ImageConfiguration.empty, "assets/sb1.png")
+    BitmapDescriptor.fromAssetImage(ImageConfiguration.empty, "assets/sb2.png")
         .then(
       (icon) {
         currentLocationIcon = icon;
@@ -66,10 +67,9 @@ class OrderTrackingPageState extends State<OrderTrackingPage>
     print('completed getpolypoints');
   }
 
-  LocationData? currentLocation;
+  Position? currentLocation;
   void getCurrentLocation() async {
-    Location location = Location();
-    location.getLocation().then(
+    Geolocator.getCurrentPosition().then(
       (location) {
         dev.log('got location');
         currentLocation = location;
@@ -79,25 +79,64 @@ class OrderTrackingPageState extends State<OrderTrackingPage>
 
     // GoogleMapController googleMapController = await _controller.future;
 
-    location.onLocationChanged.listen(
-      (newLoc) {
-        dev.log('onListner');
-        currentLocation = newLoc;
-        travelled.add(LatLng(newLoc.latitude!, newLoc.longitude!));
-        travelled.removeAt(0);
-        dev.log(travelled.toString());
-        animateCar(
+    Geolocator.getPositionStream().listen((newLoc) async {
+      var latLng = LatLng(newLoc.latitude, newLoc.longitude);
+      bool isLocationOnPath = PolyLineUtils().isLocationOnEdge(
+        latLng,
+        polylineCoordinates,
+      );
+
+      final tarvelledDistnace = Geolocator.distanceBetween(
+        newLoc.latitude,
+        newLoc.longitude,
+        travelled[1].latitude,
+        travelled[1].longitude,
+      );
+      dev.log('trvaled dist $tarvelledDistnace');
+      if (tarvelledDistnace < 4) {
+        return;
+      }
+      var res =
+          PolyLineUtils().getNearestPointOnLine(polylineCoordinates, latLng);
+
+      final nearestIndex = res[1];
+      if (nearestIndex < polylineCoordinates.length - 1) {
+        bool isLocationOnEdge = PolyLineUtils().isLocationOnEdge(
+          latLng,
+          [
+            polylineCoordinates[nearestIndex],
+            polylineCoordinates[nearestIndex + 1],
+          ],
+        );
+        dev.log('isLoc $isLocationOnEdge');
+        polylineCoordinates = polylineCoordinates
+            .sublist(isLocationOnEdge ? nearestIndex + 1 : nearestIndex);
+      }
+      if (!isLocationOnPath) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Not on path')));
+        // final  polylineCoordinateString=  await PolyLineUtils().getDirections(latLng);
+        // try{
+
+        // } catch(_){
+
+        // }
+      } else {
+        polylineCoordinates.insert(0, latLng);
+      }
+      currentLocation = newLoc;
+      travelled.add(latLng);
+      travelled.removeAt(0);
+      dev.log(travelled.toString());
+      animateCar(
           travelled[0].latitude,
           travelled[0].longitude,
           travelled[1].latitude,
           travelled[1].longitude,
           _mapMarkerSink,
           this,
-        );
-
-        // setState(() {});
-      },
-    );
+          _gcontroller);
+    });
   }
 
   @override
@@ -134,7 +173,7 @@ class OrderTrackingPageState extends State<OrderTrackingPage>
               polylines: {
                 Polyline(
                   polylineId: const PolylineId("route"),
-                  points: polylineCoordinates,
+                  points: [fromPolyline, ...polylineCoordinates],
                   color: const Color(0xFF8A59A3),
                   width: 6,
                 ),
@@ -148,7 +187,7 @@ class OrderTrackingPageState extends State<OrderTrackingPage>
                 // _controller.complete(mapController);
                 dev.log("map created");
                 _gcontroller = mapController;
-                _gcontroller.setMapStyle(mapStyle);
+                _gcontroller?.setMapStyle(mapStyle);
                 // setState(() {});
                 // getCurrentLocation();
               },
@@ -157,6 +196,7 @@ class OrderTrackingPageState extends State<OrderTrackingPage>
     );
   }
 
+  LatLng fromPolyline = orginLatLng;
   animateCar(
     double fromLat, //Starting latitude
     double fromLong, //Starting longitude
@@ -166,10 +206,12 @@ class OrderTrackingPageState extends State<OrderTrackingPage>
         mapMarkerSink, //Stream build of map to update the UI
     TickerProvider
         provider, //Ticker provider of the widget. This is used for animation
-    // GoogleMapController controller, //Google map controller of our widget
+    GoogleMapController? controller, //Google map controller of our widget
   ) async {
-    final double bearing =
-        getBearing(LatLng(fromLat, fromLong), LatLng(toLat, toLong));
+    var from = LatLng(fromLat, fromLong);
+    var to = LatLng(toLat, toLong);
+
+    final double bearing = getBearing(from, to);
 
     _markers.clear();
 
@@ -222,11 +264,18 @@ class OrderTrackingPageState extends State<OrderTrackingPage>
 
         //Adding new marker to our list and updating the google map UI.
         _markers.add(carMarker);
+        fromPolyline = newPos;
         mapMarkerSink.add(_markers);
 
         //Moving the google camera to the new animated location.
 
-        // controller.animateCamera(CameraUpdate.newCameraPosition(
+        controller?.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
+          target: newPos,
+          zoom: 17.5,
+          tilt: 75,
+          bearing: bearing,
+        )));
+        // controller?.animateCamera(CameraUpdate.newCameraPosition(
         //     CameraPosition(target: newPos, zoom: 15.5)));
       });
 
